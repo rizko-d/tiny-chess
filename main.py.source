@@ -1,0 +1,304 @@
+import json,os,urllib.request as u
+V=[0,100,320,330,500,900,0]
+KN=[-33,-31,-18,-14,14,18,31,33]
+KG=[1,-1,16,-16,15,17,-15,-17]
+BD=[15,17,-15,-17]
+RD=[1,-1,16,-16]
+QD=BD+RD
+CK=[15]*128
+for s,v in ((0,13),(7,14),(4,12),(112,7),(119,11),(116,3)):CK[s]=v
+P=[0]*896
+KM=[0]*128
+KE=[0]*128
+for r in range(8):
+ for f in range(8):
+  q=r*16+f;c=min(f,7-f)+min(r,7-r)
+  P[128+q]=[0,0,4,8,14,24,40,0][r]+([0,0,0,10,15,10,5,0][r] if f in(3,4) else 0)
+  for t,a,b in((2,6,-20),(3,4,-8),(5,2,-6)):P[t*128+q]=a*c+b
+  P[512+q]=(15 if r==6 else 0)+(5 if r==0 and f in(3,4) else 0)
+  KM[q]=[20,25,10,0,0,10,25,20][f] if r==0 else max(-50,-15*r)
+  KE[q]=8*c-24
+Q=[0]*1664
+for p in range(1,7):
+ for s in range(128):
+  if s&136:continue
+  Q[(p+6)*128+s]=V[p]+P[p*128+s];Q[(6-p)*128+s]=-(V[p]+P[p*128+(s^112)])
+B=[0]*128
+W=1;C=0;E=-1;S=0;NM=[0,0];Z=0;WK=4;BK=116;NB=[0,0];N=0;RP={};CG=0
+U=[];TT={};KL=[[0,0] for _ in range(128)];HI=[0]*896
+BUD=100000
+class AB(Exception):pass
+KK=KN+KG
+def atk(q,by):
+ for o in (q-15*by,q-17*by):
+  if not o&136 and B[o]==by:return 1
+ for i,d in enumerate(KK):
+  o=q+d
+  if not o&136 and B[o]==by*(2 if i<8 else 6):return 1
+ for d in BD:
+  o=q+d
+  while not o&136:
+   p=B[o]
+   if p:
+    if p==by*3 or p==by*5:return 1
+    break
+   o+=d
+ for d in RD:
+  o=q+d
+  while not o&136:
+   p=B[o]
+   if p:
+    if p==by*4 or p==by*5:return 1
+    break
+   o+=d
+ return 0
+def make(m):
+ global W,C,E,S,WK,BK
+ f=m&127;t=m>>7&127;pr=m>>14&7
+ pc=B[f];cap=B[t];cs=t;d=16*W
+ if abs(pc)==1 and t==E and not cap:cs=t-d;cap=B[cs]
+ U.append((m,cap,cs,C,E,S,NM[0],NM[1],WK,BK,NB[0],NB[1]))
+ S-=Q[(pc+6)*128+f]
+ if cap:
+  S-=Q[(cap+6)*128+cs]
+  if abs(cap)>1:NM[0 if cap>0 else 1]-=V[abs(cap)]
+  if abs(cap)==3:
+   i=0 if cap>0 else 1
+   if NB[i]==2:S-=30 if i==0 else -30
+   NB[i]-=1
+ if pr:
+  NM[0 if pc>0 else 1]+=V[pr]-100
+  if pr==3:
+   i=0 if pc>0 else 1
+   if NB[i]==1:S+=30 if i==0 else -30
+   NB[i]+=1
+ np=pr*(1 if pc>0 else -1) if pr else pc
+ S+=Q[(np+6)*128+t]
+ if abs(pc)==6 and abs(t-f)==2:
+  rs,rt=(f+3,f+1) if t>f else (f-4,f-1)
+  rk=B[rs];B[rt]=rk;B[rs]=0
+  S-=Q[(rk+6)*128+rs];S+=Q[(rk+6)*128+rt]
+ if abs(pc)==6:
+  if pc>0:WK=t
+  else:BK=t
+ B[f]=0;B[t]=np
+ if cap and cs!=t:B[cs]=0
+ C&=CK[f]&CK[t]
+ E=f+d if abs(pc)==1 and abs(t-f)==32 else -1
+ W=-W
+def unmake():
+ global W,C,E,S,WK,BK
+ m,cap,cs,C,E,S,NM[0],NM[1],WK,BK,NB[0],NB[1]=U.pop()
+ f=m&127;t=m>>7&127;pr=m>>14&7
+ pc=B[t]
+ B[f]=(1 if pc>0 else -1) if pr else pc
+ B[t]=0
+ if cap:B[cs]=cap
+ if abs(pc)==6 and abs(t-f)==2:
+  rs,rt=(f+3,f+1) if t>f else (f-4,f-1)
+  B[rs]=B[rt];B[rt]=0
+ if abs(pc)==6:
+  if pc>0:WK=f
+  else:BK=f
+ W=-W
+def gen(cp):
+ ms=[]
+ for s in range(128):
+  if s&136:continue
+  p=B[s]
+  if p*W<=0:continue
+  t=abs(p)
+  if t==1:
+   d=16*W;o=s+d
+   if not B[o]:
+    if o>>4 in(0,7):ms.append(s|o<<7|5<<14)
+    elif not cp:
+     ms.append(s|o<<7)
+     if s>>4==(1 if W>0 else 6) and not B[o+d]:ms.append(s|(o+d)<<7)
+   for o in(s+d-1,s+d+1):
+    if o&136:continue
+    if B[o]*W<0 or o==E:
+     if o>>4 in(0,7):ms.append(s|o<<7|5<<14)
+     else:ms.append(s|o<<7)
+  elif t==2 or t==6:
+   for d in(KN if t==2 else KG):
+    o=s+d
+    if not o&136 and B[o]*W<=0 and (B[o] or not cp):ms.append(s|o<<7)
+  else:
+   for d in(BD if t==3 else RD if t==4 else QD):
+    o=s+d
+    while not o&136:
+     if B[o]:
+      if B[o]*W<0:ms.append(s|o<<7)
+      break
+     if not cp:ms.append(s|o<<7)
+     o+=d
+ if not cp:
+  for a,b,r,c in((4,6,7,1),(4,2,0,2),(116,118,119,4),(116,114,112,8)):
+   if C&c and B[a]==(6 if a==4 else -6) and B[r]==(4 if a==4 else -4):
+    s=1 if b>a else -1;o=a+s;ok=1
+    while o!=r:
+     if B[o]:ok=0;break
+     o+=s
+    if ok and not atk(a,-W) and not atk(a+s,-W) and not atk(b,-W):ms.append(a|b<<7)
+ return ms
+def ev():
+ np=NM[0]+NM[1];ph=np if np<6400 else 6400
+ k=((KM[WK]-KM[BK^112])*ph+(KE[WK]-KE[BK^112])*(6400-ph))//6400
+ return (S+k+10)*W
+def order(ms,tm,pl):
+ def sc(m):
+  if m==tm:return 1000000
+  t=B[m>>7&127];v=0
+  if t:v=V[abs(t)]*10-V[abs(B[m&127])]
+  elif (m>>7&127)==E and abs(B[m&127])==1:v=1000
+  if v:return 10000+v
+  if pl<128:
+   if m==KL[pl][0]:return 9000
+   if m==KL[pl][1]:return 8000
+  return HI[abs(B[m&127])*128+(m>>7&127)]//64
+ return sorted(ms,key=sc,reverse=True)
+def qs(a,b,pl):
+ global N
+ N+=1
+ if N>BUD:raise AB
+ k=WK if W>0 else BK
+ ch=atk(k,-W)
+ if not ch:
+  st=ev()
+  if st>=b:return b
+  if st>a:a=st
+ ms=gen(not ch);c=0
+ for m in order(ms,0,pl):
+  make(m)
+  if atk(WK if W<0 else BK,W):unmake();continue
+  c+=1;s=-qs(-b,-a,pl+1);unmake()
+  if s>=b:return b
+  if s>a:a=s
+ if ch and not c:return -100000+pl
+ return a
+def ky():return (tuple(B),W,C,E)
+def ab(d,a,b,pl):
+ global N,E,W
+ N+=1
+ if N>BUD:raise AB
+ k=WK if W>0 else BK
+ ch=atk(k,-W)
+ if ch:d+=1
+ if d<=0:return qs(a,b,pl)
+ y=ky();e=TT.get(y)
+ if e and e[0]>=d:
+  if e[2]==0:return e[1]
+  if e[2]==1 and e[1]>=b:return e[1]
+  if e[2]==2 and e[1]<=a:return e[1]
+ if d>=3 and not ch and NM[0 if W>0 else 1]>0 and ev()>=b:
+  oE=E
+  E=-1;W=-W
+  s=-ab(d-3,-b,-b+1,pl+1)
+  E=oE;W=-W
+  if s>=b:return b
+ ms=gen(False)
+ tm=e[3] if e else 0
+ best=-1000000;fl=2;bm=0;c=0
+ for m in order(ms,tm,pl):
+  make(m)
+  if atk(WK if W<0 else BK,W):unmake();continue
+  c+=1
+  if c>3 and d>=3 and not U[-1][1] and not(m>>14&7) and not ch:
+   s=-ab(d-2,-b,-a,pl+1)
+   if s>a:s=-ab(d-1,-b,-a,pl+1)
+  else:s=-ab(d-1,-b,-a,pl+1)
+  unmake()
+  if s>best:best=s;bm=m
+  if best>a:a=best;fl=0
+  if a>=b:
+   fl=1
+   if not B[m>>7&127] and pl<128:
+    if m!=KL[pl][0]:KL[pl][1]=KL[pl][0];KL[pl][0]=m
+    HI[abs(B[m&127])*128+(m>>7&127)]+=d*d
+   break
+ if not c:return -100000+pl if ch else 0
+ TT[y]=(d,best,fl,bm)
+ return best
+def root(ms,d):
+ global BM
+ a=-1000000;bm=ms[0]
+ for m in order(ms,BM,0):
+  make(m);s=-ab(d-1,-1000000,-a,1);unmake()
+  if s>a:a=s;bm=m
+ return bm,a
+def setup(fen):
+ global W,C,E,S,WK,BK
+ p=fen.split()
+ for i in range(128):B[i]=0
+ S=0;NM[0]=0;NM[1]=0;NB[0]=0;NB[1]=0
+ for r,row in enumerate(p[0].split('/')):
+  f=0
+  for ch in row:
+   if ch.isdigit():f+=int(ch)
+   else:
+    s=(7-r)*16+f;t='pnbrqk'.index(ch.lower())+1
+    if ch.islower():t=-t
+    B[s]=t
+    if abs(t)==6:
+     if t>0:WK=s
+     else:BK=s
+    else:
+     S+=Q[(t+6)*128+s]
+     if abs(t)>1:NM[0 if t>0 else 1]+=V[abs(t)]
+     if abs(t)==3:NB[0 if t>0 else 1]+=1
+    f+=1
+ W=1 if p[1]=='w' else -1
+ C=0
+ for ch in p[2]:C|={'K':1,'Q':2,'k':4,'q':8}.get(ch,0)
+ E=-1
+ if p[3]!='-':E=(int(p[3][1])-1)*16+ord(p[3][0])-97
+ S+=30*(NB[0]>1)-30*(NB[1]>1)
+def uci(m):
+ f=m&127;t=m>>7&127;pr=m>>14&7
+ return chr(97+(f&7))+str((f>>4)+1)+chr(97+(t&7))+str((t>>4)+1)+('pnbrqk'[pr-1] if pr else '')
+def par(u):
+ f=(ord(u[1])-49)*16+ord(u[0])-97;t=(ord(u[3])-49)*16+ord(u[2])-97
+ return f|t<<7|(('pnbrqk'.index(u[4])+1)<<14 if len(u)>4 else 0)
+BM=0
+def choose(gn,fen,legal):
+ global N,BM,RP,CG
+ if gn!=CG:RP={};CG=gn
+ setup(fen)
+ RP[ky()]=RP.get(ky(),0)+1
+ ms=[par(u) for u in legal]
+ bm=ms[0];bs=-1000000;BM=0;N=0
+ if len(TT)>100000:TT.clear()
+ for d in range(1,30):
+  try:bm,bs=root(ms,d)
+  except AB:break
+  BM=bm
+ make(bm);rp=RP.get(ky(),0)>=2;unmake()
+ # Contempt: avoid repeating when winning OR drawish (bs>=-20); only
+ # repeat deliberately when clearly worse, where a draw is a good result.
+ if rp and bs>=-20:
+  m2=[m for m in ms if m!=bm]
+  if m2:
+   b2=m2[0];s2=-1000000;BM=0;N=0
+   for d in range(1,30):
+    try:b2,s2=root(m2,d)
+    except AB:break
+    BM=b2
+   make(b2)
+   if RP.get(ky(),0)<2:bm=b2
+   unmake()
+ make(bm);RP[ky()]=RP.get(ky(),0)+1;unmake()
+ return uci(bm)
+def post(path,body):
+ req=u.Request(os.environ['MAKEFUN_ENV_URL']+path,data=json.dumps(body).encode(),headers={'content-type':'application/json'})
+ with u.urlopen(req) as r:return json.load(r)
+def main():
+ while True:
+  g=post('/game',{})
+  if g['status']=='done':break
+  while g['status']=='your_move':
+   try:mv=choose(g['game'],g['fen'],g['legal_moves'])
+   except Exception:mv=g['legal_moves'][0]
+   try:g=post('/move',{'game':g['game'],'move':mv})
+   except Exception:g=post('/move',{'game':g['game'],'move':g['legal_moves'][0]})
+if __name__=='__main__':main()
